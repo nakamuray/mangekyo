@@ -21,6 +21,7 @@ library
                      , Mangekyo.Conduit.JSON
                      , Mangekyo.Conduit.Line
                      , Mangekyo.Conduit.LTSV
+                     , Mangekyo.Conduit.Null
                      , Mangekyo.Conduit.Word
                      , Mangekyo.Type
                      , Mangekyo.Lens

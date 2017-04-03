@@ -13,6 +13,7 @@ import qualified Mangekyo.Conduit.Csv as CC
 import qualified Mangekyo.Conduit.JSON as CJ
 import qualified Mangekyo.Conduit.Line as CLi
 import qualified Mangekyo.Conduit.LTSV as CLt
+import qualified Mangekyo.Conduit.Null as CN
 import qualified Mangekyo.Conduit.Word as CW
 
 -- temporary data structure to parse "-i -o" and "-b"
@@ -65,7 +66,7 @@ parser = COption
     makeMap _ [] = []
 
 availableFormats :: [Format]
-availableFormats = [CC.format, CJ.format, CLi.format, CLt.format, CW.format]
+availableFormats = [CC.format, CJ.format, CLi.format, CLt.format, CN.format, CW.format]
 
 main :: IO ()
 main = run . optToOpt =<< execParser opts
