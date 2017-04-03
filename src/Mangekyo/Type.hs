@@ -32,6 +32,7 @@ module Mangekyo.Type
     , bool'
     , not_
     , unit
+    , length_
 
     , module Control.Monad.Trans
     , module Control.Monad.State
@@ -220,3 +221,11 @@ not_ v = not_ $ bool v
 
 unit :: Value
 unit = Tuple []
+
+length_ :: Value -> Value
+length_ (Array v) = Number $ fromIntegral $ V.length v
+length_ (Object h) = Number $ fromIntegral $ H.size h
+length_ (String t) = Number $ fromIntegral $ T.length t
+length_ (Tuple l) = Number $ fromIntegral $ length l
+length_ Null = Null
+length_ v = error $ "undefined: length " ++ show v

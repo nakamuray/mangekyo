@@ -50,6 +50,7 @@ builtins =
     , ("fmt", function1M fmt)
     , ("split", function2 split_)
     , ("not", function1 not_)
+    , ("length", function1 length_)
 
     -- conduit functions
     , ("yield", function1M yield_)
