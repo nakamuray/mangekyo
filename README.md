@@ -114,6 +114,9 @@ $ echo '{"value":1}{"value":2}{"value":3}' | mgk 'map { _^.@value } | fold (+) 0
 `bool :: value -> bool`
   Convert `value` to bool.
 
+`not :: value -> bool`
+  Negate boolean `value`.
+
 `if :: bool -> then_function -> else_function`
   If `bool` is true value, then call `then_function`, else call `else_function`.
 
@@ -241,9 +244,18 @@ one is downstream.
 `filter :: function -> ()`
   Filter stream by predicate `function`.
   ```console
-  $ seq 10 | mgk 'filter { _ < 3 }'
+  $ seq 5 | mgk 'filter { _ < 3 }'
   1
   2
+  ```
+
+`filter :: function -> ()`
+  Exclude stream by predicate `function`.
+  ```console
+  $ seq 5 | mgk 'filter { _ < 3 }'
+  3
+  4
+  5
   ```
 
 `each :: function -> ()`

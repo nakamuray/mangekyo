@@ -49,6 +49,7 @@ builtins =
     , ("items", function1 items_)
     , ("fmt", function1M fmt)
     , ("split", function2 split_)
+    , ("not", function1 not_)
 
     -- conduit functions
     , ("yield", function1M yield_)
@@ -56,6 +57,7 @@ builtins =
     , ("fold", function2M fold_)
     , ("map", function1M map_)
     , ("filter", function1M filter_)
+    , ("exclude", function1M exclude_)
     , ("each", function1M each_)
     , ("concat", function1M concat_)
     , ("consume", function1M consume_)
@@ -147,6 +149,13 @@ filter_ f = do
     awaitForever $ \v -> do
         ret <- funcCall f v
         when (bool' ret) $ yield v
+    return Null
+
+exclude_ :: Value -> Mangekyo Value
+exclude_ f = do
+    awaitForever $ \v -> do
+        ret <- funcCall f v
+        when (not $ bool' ret) $ yield v
     return Null
 
 each_ :: Value -> Mangekyo Value
