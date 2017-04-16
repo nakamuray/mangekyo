@@ -48,10 +48,10 @@ library
                      , lens
                      , mtl
                      , parsers
+                     , pcre-light
                      , pretty-show
                      , scientific
                      , text
-                     , text-icu
                      , trifecta
                      , unordered-containers
                      , utf8-string

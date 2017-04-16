@@ -12,13 +12,14 @@ import Data.Maybe (fromMaybe, isJust)
 import Data.Monoid ((<>))
 import Data.Scientific (fromFloatDigits, toBoundedInteger, toRealFloat)
 import Data.Text (Text)
-import Data.Text.ICU (regex', find, group, unfold)
+import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import System.Exit (ExitCode(..), exitWith)
 
 import qualified Data.Conduit.List as CL
 import qualified Data.HashMap.Strict as H
 import qualified Data.Text as T
 import qualified Data.Vector as V
+import qualified Text.Regex.PCRE.Light as PCRE
 
 import Mangekyo.Interpreter
 import Mangekyo.Lens
@@ -364,9 +365,9 @@ negative_ v = negative_ (number v)
 
 match_ :: Value -> Value -> Value
 match_ (String t) (String pat) =
-    case regex' [] pat of
-        Left e  -> error $ show e
-        Right r -> maybe Null (Array . V.fromList . map String . unfold group) $ find r t
+    case PCRE.compileM (encodeUtf8 pat) [PCRE.utf8] of
+        Left e  -> error e
+        Right r -> maybe Null (Array . V.fromList . map (String . decodeUtf8)) $ PCRE.match r (encodeUtf8 t) []
 match_ v w = match_ (string v) (string w)
 
 notMatch_ :: Value -> Value -> Value
