@@ -49,6 +49,7 @@ library
                      , mtl
                      , parsers
                      , pcre-light
+                     , process
                      , pretty-show
                      , scientific
                      , text

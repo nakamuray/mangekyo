@@ -14,6 +14,7 @@ import Data.Scientific (fromFloatDigits, toBoundedInteger, toRealFloat)
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import System.Exit (ExitCode(..), exitWith)
+import System.Process (rawSystem, system)
 
 import qualified Data.Conduit.List as CL
 import qualified Data.HashMap.Strict as H
@@ -52,6 +53,7 @@ builtins =
     , ("split", function2 split_)
     , ("not", function1 not_)
     , ("length", function1 length_)
+    , ("system", function1M system_)
 
     -- conduit functions
     , ("yield", function1M yield_)
@@ -121,6 +123,25 @@ items_ v = error $ "not a object: " ++ show v
 split_ :: Value -> Value -> Value
 split_ (String sep) (String t) = Array $ V.fromList $ map String $ T.splitOn sep t
 split_ sep s = split_ (string sep) (string s)
+
+system_ :: Value -> Mangekyo Value
+system_ (String s) = do
+    r <- liftIO $ system $ T.unpack s
+    return $ Number $ fromIntegral $ exitCodeToInt r
+system_ (Array v) = do
+    case V.toList v of
+        [] -> error "empty list"
+        (cmd:args) -> do
+            r <- liftIO $ rawSystem (toString cmd) (map toString args)
+            return $ Number $ fromIntegral $ exitCodeToInt r
+
+  where
+    toString (String t) = T.unpack t
+    toString v = toString $ string v
+
+exitCodeToInt :: ExitCode -> Int
+exitCodeToInt ExitSuccess = 0
+exitCodeToInt (ExitFailure i) = i
 
 yield_ :: Value -> Mangekyo Value
 yield_ v = yield v >> return Null

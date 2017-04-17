@@ -159,6 +159,12 @@ $ echo '{"value":1}{"value":2}{"value":3}' | mgk 'map { _^.@value } | fold (+) 0
 `negative :: number -> number`
   Negate a `number`.
 
+`length :: value -> number`
+  Return length of value.
+
+`system :: string_or_array -> number`
+  Execute command and return exit status.
+
 `p :: value -> ()`
   Print `value` directly (for debug purpose)
 
