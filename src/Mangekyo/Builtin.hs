@@ -66,6 +66,7 @@ builtins =
     , ("concat", function1M concat_)
     , ("consume", function1M consume_)
     , ("concatMap", function1M concatMap_)
+    , ("filterMap", function1M filterMap_)
     , ("isolate", function1M isolate_)
     , ("chunksOf", function1M chunksOf_)
     , ("iterate", function2M iterate_)
@@ -198,6 +199,9 @@ concat_ _ = do
 
 concatMap_ :: Value -> Mangekyo Value
 concatMap_ f = (map_ f >> return ()) =$= concat_ Null
+
+filterMap_ :: Value -> Mangekyo Value
+filterMap_ f = (map_ f >> return ()) =$= CL.filter bool' >> return Null
 
 consume_ :: Value -> Mangekyo Value
 consume_ _ = do

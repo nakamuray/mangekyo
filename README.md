@@ -328,6 +328,14 @@ $ seq 3 | mgk 'concatMap { [_, _] }'
 3
 ```
 
+#### filterMap :: function -> ()
+Map a `function` and filter a result.
+Only true values are passed to downstream.
+```console
+$ echo '{"value":1}' '{}' | mgk 'filterMap { _ ^. @value }'
+1
+```
+
 #### isolate :: number -> ()
 Isolate given number of items to downstream.
 ```console

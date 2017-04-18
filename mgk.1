@@ -386,6 +386,17 @@ $\ seq\ 3\ |\ mgk\ \[aq]concatMap\ {\ [_,\ _]\ }\[aq]
 3
 \f[]
 .fi
+.SS filterMap :: function \-> ()
+.PP
+Map a \f[C]function\f[] and filter a result.
+Only true values are passed to downstream.
+.IP
+.nf
+\f[C]
+$\ echo\ \[aq]{"value":1}\[aq]\ \[aq]{}\[aq]\ |\ mgk\ \[aq]filterMap\ {\ _\ ^.\ \@value\ }\[aq]
+1
+\f[]
+.fi
 .SS isolate :: number \-> ()
 .PP
 Isolate given number of items to downstream.
