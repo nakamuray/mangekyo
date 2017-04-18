@@ -21,6 +21,7 @@ You can use [stack](https://www.haskellstack.org/) to build and install it.
 
 ```console
 $ cd mangekyo
+$ stack setup
 $ stack install
 ```
 
