@@ -109,7 +109,7 @@ builtins =
 
     , ("negative", function1 negative_)
 
-    , ("p", function1M $ \v -> liftIO (print v) >> return Null)
+    , ("p", function1M $ \v -> liftIO (print v) >> return unit)
     ]
 
 for_ :: Value -> Value -> Mangekyo Value
@@ -145,7 +145,7 @@ exitCodeToInt ExitSuccess = 0
 exitCodeToInt (ExitFailure i) = i
 
 yield_ :: Value -> Mangekyo Value
-yield_ v = yield v >> return Null
+yield_ v = yield v >> return unit
 
 await_ :: Value -> Mangekyo Value
 await_ _ = fromMaybe Null <$> await
@@ -166,33 +166,33 @@ map_ f = do
     awaitForever $ \v -> do
         v' <- funcCall f v
         yield v'
-    return Null
+    return unit
 
 filter_ :: Value -> Mangekyo Value
 filter_ f = do
     awaitForever $ \v -> do
         ret <- funcCall f v
         when (bool' ret) $ yield v
-    return Null
+    return unit
 
 exclude_ :: Value -> Mangekyo Value
 exclude_ f = do
     awaitForever $ \v -> do
         ret <- funcCall f v
         when (not $ bool' ret) $ yield v
-    return Null
+    return unit
 
 each_ :: Value -> Mangekyo Value
 each_ f = do
     awaitForever $ \v -> do
         _ <- funcCall f v
         return ()
-    return Null
+    return unit
 
 concat_ ::  Value -> Mangekyo Value
 concat_ _ = do
     awaitForever concat_'
-    return Null
+    return unit
   where
     concat_' (Array v) = V.mapM_ yield v
     concat_' v = concat_' $ array v
@@ -201,7 +201,7 @@ concatMap_ :: Value -> Mangekyo Value
 concatMap_ f = (map_ f >> return ()) =$= concat_ Null
 
 filterMap_ :: Value -> Mangekyo Value
-filterMap_ f = (map_ f >> return ()) =$= CL.filter bool' >> return Null
+filterMap_ f = (map_ f >> return ()) =$= CL.filter bool' >> return unit
 
 consume_ :: Value -> Mangekyo Value
 consume_ _ = do
@@ -211,12 +211,12 @@ consume_ _ = do
 isolate_ :: Value -> Mangekyo Value
 isolate_ v = do
     CL.isolate (round $ number' v)
-    return Null
+    return unit
 
 chunksOf_ :: Value -> Mangekyo Value
 chunksOf_ v = do
     CL.chunksOf (round $ number' v) =$= CL.map (Array . V.fromList)
-    return Null
+    return unit
 
 iterate_ :: Value -> Value -> Mangekyo Value
 iterate_ f v = do
@@ -227,7 +227,7 @@ iterate_ f v = do
 mergeSource_ :: Value -> Mangekyo Value
 mergeSource_ f = do
     mergeSource (CL.sourceNull =$= funcCall f unit >> return ()) =$= CL.map (\(v1, v2) -> Tuple [v1, v2])
-    return Null
+    return unit
 
 zipConduit_ :: Value -> Value -> Mangekyo Value
 zipConduit_ f1 f2 = do
@@ -236,14 +236,14 @@ zipConduit_ f1 f2 = do
     return $ Tuple [r1, r2]
 
 sourceArray_ :: Value -> Mangekyo Value
-sourceArray_ a@(Array v) = V.mapM_ yield v >> return a
+sourceArray_ a@(Array v) = V.mapM_ yield v >> return unit
 sourceArray_ v = sourceArray_ $ array v
 
 leftover_ :: Value -> Mangekyo Value
-leftover_ v = leftover v >> return Null
+leftover_ v = leftover v >> return unit
 
 replicate_ :: Value -> Value -> Mangekyo Value
-replicate_ (Number s) v = CL.replicate (round s) v >> return Null
+replicate_ (Number s) v = CL.replicate (round s) v >> return unit
 replicate_ n v = replicate_ (number n) v
 
 peek_ :: Value -> Mangekyo Value
