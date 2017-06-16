@@ -67,6 +67,10 @@ executable mgk
                      , optparse-applicative
                      , mangekyo
   default-language:    Haskell2010
+  if os(darwin) {
+    -- XXX: for pcre-light (iconv?)
+    extra-lib-dirs: /usr/lib
+  }
 
 test-suite mangekyo-test
   type:                exitcode-stdio-1.0
