@@ -58,9 +58,13 @@ run opt = do
         (_, Left e) -> error e
         (True, Right program) -> pprint program
         (_, Right program) -> do
-            let mangekyo = interpret program >> return ()
+            let mangekyo = interpret program >>= yieldIfNotUnit
                 ns = Type.Object $ H.fromList builtins
             flip runMangekyo ns $ CB.sourceHandle stdin =$= opt^.input =$= mangekyo =$= opt^.output $$ CB.sinkHandle stdout
+
+  where
+    yieldIfNotUnit (Tuple []) = return ()
+    yieldIfNotUnit v = yield v
 
 runCode :: String -> IO ()
 runCode s = run $ def & code .~ s
