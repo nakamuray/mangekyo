@@ -26,7 +26,7 @@ expr (AST.Function p body) = return $ Type.Function func
     func :: Function
     func v = do
         case match p v of
-            Nothing -> error "argument mismatch"
+            Nothing -> error_ "argument mismatch"
             Just ms -> do
                 -- TODO: local namespace (?)
                 modify $ \(Type.Object h) -> Type.Object (H.fromList ms <> h)
@@ -34,10 +34,11 @@ expr (AST.Function p body) = return $ Type.Function func
                     [] -> return Null
                     _  -> foldM (const expr) Null body
 -- TODO: use location
-expr (FuncCall _ f v) =
+expr (FuncCall loc f v) =
     let f' = expr f
         v' = expr v
     in do
+        setLocation loc
         f'' <- f'
         v'' <- v'
         funcCall f'' v''
@@ -90,7 +91,7 @@ matchHash ps oh = do
 
 funcCall :: Value -> Value -> Mangekyo Value
 funcCall (Type.Function f) v = f v
-funcCall o _ = error $ "not a collable: " ++ typeName o
+funcCall o _ = error_ $ "not a collable: " ++ typeName o
 
 pipe :: [Value] -> Mangekyo Value
 pipe (e:es) = foldl (\m f -> (m >> return ()) =$= (funcCall f unit)) (funcCall e unit) es

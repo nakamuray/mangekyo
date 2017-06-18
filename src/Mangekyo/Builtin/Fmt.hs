@@ -20,7 +20,7 @@ import Mangekyo.Type hiding (string)
 fmt :: Value -> Mangekyo Value
 fmt (String f) =
     case expandPrep f of
-        Failure e  -> error $ show e
+        Failure e  -> error_ $ show e
         Success es -> String <$> foldM go "" es
   where
     go buf (Right c) = return $ buf `snoc` c
@@ -29,7 +29,7 @@ fmt (String f) =
     string'' (String t) = t
     string'' v = string' v
 
-fmt v = error $ "fmt: not a string: " <> show v
+fmt v = error_ $ "fmt: not a string: " <> show v
 
 expandPrep :: Text -> Result [Either Expression Char]
 expandPrep = parseString p_fmt mempty . unpack

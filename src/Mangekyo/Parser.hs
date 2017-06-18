@@ -169,8 +169,8 @@ pipeBody e = Function (PVariable "_" Nothing) [e]
 
 term'' :: Parser (Location, Expression)
 term'' = lexeme $ do
-    e <- try function <|> try parensesEnclosed <|> array <|> object <|> variable <|> string_ <|> number <|> lens
     loc <- getLocation
+    e <- try function <|> try parensesEnclosed <|> array <|> object <|> variable <|> string_ <|> number <|> lens
     whiteSpace
     return (loc, e)
   <?> "expression"

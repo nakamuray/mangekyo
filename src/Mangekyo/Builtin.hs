@@ -33,9 +33,11 @@ builtins =
     , ("true", Bool True)
     , ("false", Bool False)
 
-    , ("string", function1 string)
+    , ("string", function1M string)
     , ("number", function1 number)
     , ("bool", function1 bool)
+    , ("object", function1M object)
+    , ("array", function1M array)
 
     , ("if", function3M if_)
     , ("pass", function1 pass_)
@@ -48,11 +50,11 @@ builtins =
     , ("id", function1 id)
     , ("const", function2 const)
     , ("for", function2M for_)
-    , ("items", function1 items_)
+    , ("items", function1M items_)
     , ("fmt", function1M fmt)
-    , ("split", function2 split_)
+    , ("split", function2M split_)
     , ("not", function1 not_)
-    , ("length", function1 length_)
+    , ("length", function1M length_)
     , ("system", function1M system_)
 
     -- conduit functions
@@ -83,12 +85,12 @@ builtins =
     -- lens
     , ("at", function1 at__)
     , ("view", function2M view_)
-    , ("set", function2 set_)
-    , ("over", function2 over_)
+    , ("set", function2M set_)
+    , ("over", function2M over_)
     , ("mapped", Type.Setter mapped_)
     , ("^.", function2M view_)
-    , (".~", function2 set_)
-    , ("%~", function2 over_)
+    , (".~", function2M set_)
+    , ("%~", function2M over_)
     , (".=", function2M assign_)
     , ("%=", function2M modifying_)
     , ("+=", function2M modifyAdd_)
@@ -96,7 +98,7 @@ builtins =
     -- operators
     , ("$", function2M apply_)
     , ("&", function2M reverseApply_)
-    , ("+", function2 add_)
+    , ("+", function2M add_)
     , ("*", function2 mul_)
     , ("/", function2 div_)
     , ("==", function2 equal)
@@ -104,8 +106,8 @@ builtins =
     , ("<", function2 lt)
     , (">=", function2 gte)
     , ("<=", function2 lte)
-    , ("=~", function2 match_)
-    , ("!~", function2 notMatch_)
+    , ("=~", function2M match_)
+    , ("!~", function2M notMatch_)
 
     , ("negative", function1 negative_)
 
@@ -114,16 +116,21 @@ builtins =
 
 for_ :: Value -> Value -> Mangekyo Value
 for_ (Array v) f = Array <$> V.mapM (funcCall f) v
-for_ v f = for_ (array v) f
+for_ v f = do
+    a <- array v
+    for_ a f
 
-items_ :: Value -> Value
-items_ (Object h) = Array $ V.fromList $ map (\(k, v) -> Tuple [String k, v]) $ H.toList h
-items_ v = error $ "not a object: " ++ show v
+items_ :: Value -> Mangekyo Value
+items_ (Object h) = return $ Array $ V.fromList $ map (\(k, v) -> Tuple [String k, v]) $ H.toList h
+items_ v = error_ $ "not a object: " ++ show v
 
 -- TODO: split using regex
-split_ :: Value -> Value -> Value
-split_ (String sep) (String t) = Array $ V.fromList $ map String $ T.splitOn sep t
-split_ sep s = split_ (string sep) (string s)
+split_ :: Value -> Value -> Mangekyo Value
+split_ (String sep) (String t) = return $ Array $ V.fromList $ map String $ T.splitOn sep t
+split_ sep s = do
+    sep' <- string sep
+    s' <- string s
+    split_ sep' s'
 
 system_ :: Value -> Mangekyo Value
 system_ (String s) = do
@@ -133,12 +140,14 @@ system_ (Array v) = do
     case V.toList v of
         [] -> error "empty list"
         (cmd:args) -> do
-            r <- liftIO $ rawSystem (toString cmd) (map toString args)
+            cmd' <- toString cmd
+            args' <- mapM toString args
+            r <- liftIO $ rawSystem cmd' args'
             return $ Number $ fromIntegral $ exitCodeToInt r
 
   where
-    toString (String t) = T.unpack t
-    toString v = toString $ string v
+    toString (String t) = return $ T.unpack t
+    toString v = toString =<< string v
 
 exitCodeToInt :: ExitCode -> Int
 exitCodeToInt ExitSuccess = 0
@@ -195,7 +204,7 @@ concat_ _ = do
     return unit
   where
     concat_' (Array v) = V.mapM_ yield v
-    concat_' v = concat_' $ array v
+    concat_' v = concat_' =<< array v
 
 concatMap_ :: Value -> Mangekyo Value
 concatMap_ f = (map_ f >> return ()) =$= concat_ Null
@@ -237,7 +246,7 @@ zipConduit_ f1 f2 = do
 
 sourceArray_ :: Value -> Mangekyo Value
 sourceArray_ a@(Array v) = V.mapM_ yield v >> return unit
-sourceArray_ v = sourceArray_ $ array v
+sourceArray_ v = sourceArray_ =<< array v
 
 leftover_ :: Value -> Mangekyo Value
 leftover_ v = leftover v >> return unit
@@ -284,7 +293,7 @@ dot f g = Function $ \v -> do
 
 view_ :: Value -> Value -> Mangekyo Value
 view_ v (Type.Lens l) = pure v ^. l
-view_ _ o = error $ "not a lens: " ++ show o
+view_ _ o = error_ $ "not a lens: " ++ show o
 
 at__ :: Value -> Value
 at__ v = Type.Lens $ at_ v
@@ -295,17 +304,17 @@ assign_ (Type.Setter s) v = do
     s' <- get & s .~ pure v
     put s'
     return v
-assign_ o _ = error $ "not a lens: " ++ show o
+assign_ o _ = error_ $ "not a lens: " ++ show o
 
-set_ :: Value -> Value -> Value
+set_ :: Value -> Value -> Mangekyo Value
 set_ (Type.Lens l) v = set_ (Type.Setter l) v
-set_ (Type.Setter s) v = function1M $ (s .~ return v) . pure
-set_ v _ = error $ "not a lens: " ++ show v
+set_ (Type.Setter s) v = return $ function1M $ (s .~ return v) . pure
+set_ v _ = error_ $ "not a lens: " ++ show v
 
-over_ :: Value -> Value -> Value
+over_ :: Value -> Value -> Mangekyo Value
 over_ (Type.Lens l) f = over_ (Type.Setter l) f
-over_ (Type.Setter s) f = function1M $ (s %~ (>>= funcCall f)) . pure
-over_ v _ = error $ "not a lens: " ++ show v
+over_ (Type.Setter s) f = return $ function1M $ (s %~ (>>= funcCall f)) . pure
+over_ v _ = error_ $ "not a lens: " ++ show v
 
 modifying_ :: Value -> Value -> Mangekyo Value
 modifying_ (Type.Lens l) f = do
@@ -317,14 +326,15 @@ modifying_ (Type.Lens l) f = do
     return v'
 modifying_ l@(Type.Setter _) f = do
     s <- get
-    s' <- funcCall (over_ l f) s
+    f' <- over_ l f
+    s' <- funcCall f' s
     put s'
     -- TODO: can I get "v'" which is returned at Lens case?
     --return v'
     return Null
 
 modifyAdd_ :: Value -> Value -> Mangekyo Value
-modifyAdd_ l v = modifying_ l (function1 $ \w -> add_ w v)
+modifyAdd_ l v = modifying_ l (function1M $ \w -> add_ w v)
 
 apply_ :: Value -> Value -> Mangekyo Value
 apply_ f v = funcCall f v
@@ -332,19 +342,19 @@ apply_ f v = funcCall f v
 reverseApply_ :: Value -> Value -> Mangekyo Value
 reverseApply_ v f = funcCall f v
 
-add_ :: Value -> Value -> Value
-add_ (Number n) (Number m) = Number (n + m)
+add_ :: Value -> Value -> Mangekyo Value
+add_ (Number n) (Number m) = return $ Number (n + m)
 add_ n@(Number _) v = add_ n (number v)
-add_ (String s) (String t) = String (s <> t)
-add_ s@(String _) v = add_ s (string v)
-add_ (Object h) (Object i) = Object (i <> h) -- ("i" overwrite "h")
-add_ o@(Object _) v = add_ o (object v)
-add_ (Array v) (Array w) = Array (v <> w)
-add_ a@(Array _) v = add_ a (array v)
+add_ (String s) (String t) = return $ String (s <> t)
+add_ s@(String _) v = add_ s =<< string v
+add_ (Object h) (Object i) = return $ Object (i <> h) -- ("i" overwrite "h")
+add_ o@(Object _) v = add_ o =<< object v
+add_ (Array v) (Array w) = return $ Array (v <> w)
+add_ a@(Array _) v = add_ a =<< array v
 add_ Null n@(Number _) = add_ (number Null) n
-add_ Null s@(String _) = add_ (string Null) s
-add_ Null o@(Object _) = add_ (object Null) o
-add_ Null a@(Array _) = add_ (array Null) a
+add_ Null s@(String _) = flip add_ s =<< string Null
+add_ Null o@(Object _) = flip add_ o =<< object Null
+add_ Null a@(Array _) = flip add_ a =<< array Null
 -- TODO: other types
 
 equal :: Value -> Value -> Value
@@ -388,15 +398,18 @@ negative_ :: Value -> Value
 negative_ (Number s) = Number (-s)
 negative_ v = negative_ (number v)
 
-match_ :: Value -> Value -> Value
+match_ :: Value -> Value -> Mangekyo Value
 match_ (String t) (String pat) =
     case PCRE.compileM (encodeUtf8 pat) [PCRE.utf8] of
-        Left e  -> error e
-        Right r -> maybe Null (Array . V.fromList . map (String . decodeUtf8)) $ PCRE.match r (encodeUtf8 t) []
-match_ v w = match_ (string v) (string w)
+        Left e  -> error_ e
+        Right r -> return $ maybe Null (Array . V.fromList . map (String . decodeUtf8)) $ PCRE.match r (encodeUtf8 t) []
+match_ v w = do
+    v' <- string v
+    w' <- string w
+    match_ v' w'
 
-notMatch_ :: Value -> Value -> Value
-notMatch_ s pat = not_ $ match_ s pat
+notMatch_ :: Value -> Value -> Mangekyo Value
+notMatch_ s pat = not_ <$> match_ s pat
 
 -- create `Function` from Value to Value function
 function1 :: (Value -> Value) -> Value

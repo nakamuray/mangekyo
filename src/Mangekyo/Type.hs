@@ -20,6 +20,9 @@ module Mangekyo.Type
     , MangekyoIO
 
     , runMangekyo
+    , getLocation
+    , setLocation
+    , error_
 
     , typeName
     , object
@@ -44,17 +47,21 @@ import Control.Lens as Lens (Lens', Setter')
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.Except (MonadError(..))
 import Control.Monad.IO.Class (MonadIO)
-import Control.Monad.Trans (MonadTrans, lift)
+import Control.Monad.Reader (MonadReader, ReaderT, runReaderT, ask)
 import Control.Monad.State (MonadState, StateT, evalStateT, get, modify, put)
+import Control.Monad.Trans (MonadTrans, lift, liftIO)
+import Data.IORef (IORef, newIORef, writeIORef, readIORef)
 import Data.Monoid ((<>))
 import Data.Scientific (Scientific, floatingOrInteger)
 import Data.Text (Text)
+import Text.Trifecta.Delta (Delta(Columns))
 
 import qualified Data.Aeson as A
 import qualified Data.HashMap.Strict as H
 import qualified Data.Text as T
 import qualified Data.Vector as V
 
+import Mangekyo.AST (Location)
 import Mangekyo.Utils
 
 
@@ -122,18 +129,36 @@ instance A.ToJSON Value where
     toJSON (Lens _) = A.String "<lens>"
     toJSON (Setter _) = A.String "<setter>"
 
-newtype MangekyoT m a = MangekyoT { runM :: StateT Namespace m a }
-    deriving (MonadState Namespace, MonadTrans, MonadThrow, MonadIO, Monad, Applicative, Functor)
+newtype MangekyoT m a = MangekyoT { runM :: StateT Namespace (ReaderT Loc m) a }
+    deriving (MonadState Namespace, MonadReader Loc, MonadThrow, MonadIO, Monad, Applicative, Functor)
 
 deriving instance MonadError e m => MonadError e (MangekyoT m)
 
 type Namespace = Value
+type Loc = IORef Location
 
 type Mangekyo = ConduitM Value Value (MangekyoT IO)
 type MangekyoIO = MangekyoT IO
 
-runMangekyo :: Monad m => MangekyoT m a -> Namespace -> m a
-runMangekyo o n = flip evalStateT n $ runM o
+runMangekyo :: MonadIO m => MangekyoT m a -> Namespace -> m a
+runMangekyo o n = do
+    rloc <- liftIO $ newIORef (Columns 0 0, "")
+    flip runReaderT rloc $ flip evalStateT n $ runM o
+
+getLocation :: Mangekyo Location
+getLocation = do
+    r <- ask
+    liftIO $ readIORef r
+
+setLocation :: Location -> Mangekyo ()
+setLocation loc = do
+    r <- ask
+    liftIO $ writeIORef r loc
+
+error_ :: String -> Mangekyo a
+error_ msg = do
+    (d, l) <- getLocation
+    error $ prettyError d l msg
 
 typeName :: Value -> String
 typeName (Object _) = "object"
@@ -147,31 +172,31 @@ typeName (Function _) = "function"
 typeName (Lens _) = "lens"
 typeName (Setter _) = "setter"
 
-object :: Value -> Value
-object o@(Object _) = o
-object Null = Object H.empty
-object v = error $ "undefined: object " <> show v
+object :: Value -> Mangekyo Value
+object o@(Object _) = return o
+object Null = return$ Object H.empty
+object v = error_ $ "undefined: object " <> show v
 
-array :: Value -> Value
-array a@(Array _) = a
-array (Object h) = Array $ V.fromList $ map String $ H.keys h
-array Null = Array V.empty
-array (String t) = Array $ V.fromList $ map (String . T.singleton) $ T.unpack t
-array o = error $ "undefined: list " <> show o
+array :: Value -> Mangekyo Value
+array a@(Array _) = return a
+array (Object h) = return $ Array $ V.fromList $ map String $ H.keys h
+array Null = return $ Array V.empty
+array (String t) = return $ Array $ V.fromList $ map (String . T.singleton) $ T.unpack t
+array o = error_ $ "undefined: array " <> show o
 
-string :: Value -> Value
-string o@(String _) = o
+string :: Value -> Mangekyo Value
+string o@(String _) = return o
 string (Number s) =
     -- XXX: to avoid ambiguous type warning, declare type explicitly
     case floatingOrInteger s :: Either Double Integer of
-        Right i -> String $ showText i
-        Left  f -> String $ showText f
-string (Bool True) = String "true"
-string (Bool False) = String "false"
-string Null = String ""
-string o@(Array _) = String $ string' o
-string o@(Object _) = String $ string' o
-string o = error $ "string: not implemented: " ++ typeName o
+        Right i -> return $ String $ showText i
+        Left  f -> return $ String $ showText f
+string (Bool True) = return $ String "true"
+string (Bool False) = return $ String "false"
+string Null = return $ String ""
+string o@(Array _) = return $ String $ string' o
+string o@(Object _) = return $ String $ string' o
+string o = error_ $ "string: not implemented: " ++ typeName o
 
 string' :: Value -> Text
 string' (String t) = lb2text $ A.encode t
@@ -204,7 +229,7 @@ number' (String t) = maybe 0 id $ parseNumber t
 number' (Bool True) = 1
 number' (Bool False) = 0
 number' Null = 0
-number' _ = error "numer: not implemented"
+number' _ = error "number: not implemented"
 
 bool :: Value -> Value
 bool v = Bool $ bool' v
@@ -222,10 +247,10 @@ not_ v = not_ $ bool v
 unit :: Value
 unit = Tuple []
 
-length_ :: Value -> Value
-length_ (Array v) = Number $ fromIntegral $ V.length v
-length_ (Object h) = Number $ fromIntegral $ H.size h
-length_ (String t) = Number $ fromIntegral $ T.length t
-length_ (Tuple l) = Number $ fromIntegral $ length l
-length_ Null = Null
-length_ v = error $ "undefined: length " ++ show v
+length_ :: Value -> Mangekyo Value
+length_ (Array v) = return $ Number $ fromIntegral $ V.length v
+length_ (Object h) = return $ Number $ fromIntegral $ H.size h
+length_ (String t) = return $ Number $ fromIntegral $ T.length t
+length_ (Tuple l) = return $ Number $ fromIntegral $ length l
+length_ Null = return $ Null
+length_ v = error_ $ "undefined: length " ++ show v

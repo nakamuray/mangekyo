@@ -24,28 +24,37 @@ at_ :: Value -> Lens' (Mangekyo Value) (Mangekyo Value)
 at_ key = lens (_getter key) (_setter key)
 
 _getter :: Value -> Mangekyo Value -> Mangekyo Value
-_getter k v = _getter' k <$> v
+_getter k v = _getter' k =<< v
 
-_getter' :: Value -> Value -> Value
-_getter' (String key) (Object h) = fromMaybe Null $ H.lookup key h
-_getter' k o@(Object _) = _getter' (string k) o
+_getter' :: Value -> Value -> Mangekyo Value
+_getter' (String key) (Object h) = return $ fromMaybe Null $ H.lookup key h
+_getter' k o@(Object _) = do
+    k' <- string k
+    _getter' k' o
 _getter' (Number s) (Array v)
-    | Just i <- toBoundedInteger s = v !!! i
-_getter' _ (Array _) = error "array index must be integer"
-_getter' _ Null = Null
-_getter' _ o = error $ "can't get from " ++ typeName o
+    | Just i <- toBoundedInteger s = return $ v !!! i
+_getter' _ (Array _) = error_ "array index must be integer"
+_getter' _ Null = return Null
+_getter' _ o = error_ $ "can't get from " ++ typeName o
 
 _setter :: Value -> Mangekyo Value -> Mangekyo Value -> Mangekyo Value
-_setter k o v = _setter' k <$> o <*> v
+_setter k o v = do
+    o' <- o
+    v' <- v
+    _setter' k o' v'
 
-_setter' :: Value -> Value -> Value -> Value
-_setter' (String key) (Object h) val = Object (H.insert key val h)
-_setter' k o@(Object _) val = _setter' (string k) o val
+_setter' :: Value -> Value -> Value -> Mangekyo Value
+_setter' (String key) (Object h) val = return $ Object (H.insert key val h)
+_setter' k o@(Object _) val = do
+    k' <- string k
+    _setter' k' o val
 _setter' (Number s) (Array v) val
-    | Just i <- toBoundedInteger s = v /// (i, val)
-_setter' _ (Array _) _ = error "array index must be integer"
-_setter' k v@(Null) val = _setter' k (object v) val
-_setter' _ o _ = error $ "can't set to " ++ typeName o
+    | Just i <- toBoundedInteger s = return $ v /// (i, val)
+_setter' _ (Array _) _ = error_ "array index must be integer"
+_setter' k v@(Null) val = do
+    v' <- object v
+    _setter' k v' val
+_setter' _ o _ = error_ $ "can't set to " ++ typeName o
 
 (!!!) :: V.Vector Value -> Int -> Value
 (!!!) v i | i >= 0    = if i < V.length v then v V.! i else Null
