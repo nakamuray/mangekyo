@@ -176,6 +176,12 @@ Negate a `number`.
 #### length :: value -> number
 Return length of `value`.
 
+#### msg :: string -> ()
+Display string to terminal (stderr).
+
+#### rawMsg :: string -> ()
+Display string to terminal (stderr), without newline.
+
 #### system :: string\_or\_array -> number
 Execute system command and return exit status.
 

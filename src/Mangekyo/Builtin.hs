@@ -14,11 +14,13 @@ import Data.Scientific (fromFloatDigits, toBoundedInteger, toRealFloat)
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import System.Exit (ExitCode(..), exitWith)
+import System.IO (stderr)
 import System.Process (rawSystem, system)
 
 import qualified Data.Conduit.List as CL
 import qualified Data.HashMap.Strict as H
 import qualified Data.Text as T
+import qualified Data.Text.IO as TI
 import qualified Data.Vector as V
 import qualified Text.Regex.PCRE.Light as PCRE
 
@@ -45,6 +47,8 @@ builtins =
     , ("unless", function2M unless_)
 
     , ("exit", function1M exit_)
+    , ("msg", function1M msg_)
+    , ("rawMsg", function1M rawMsg_)
 
     , (".", function2 dot)
     , ("id", function1 id)
@@ -281,6 +285,18 @@ exit_ v =
         case round (number' v) of
             0 -> ExitSuccess
             i -> ExitFailure i
+
+msg_ :: Value -> Mangekyo Value
+msg_ (String t) = do
+    liftIO $ TI.hPutStrLn stderr t
+    return unit
+msg_ v = msg_ =<< string v
+
+rawMsg_ :: Value -> Mangekyo Value
+rawMsg_ (String t) = do
+    liftIO $ TI.hPutStr stderr t
+    return unit
+rawMsg_ v = rawMsg_ =<< string v
 
 dot :: Value -> Value -> Value
 dot (Type.Lens l) (Type.Lens k) = Type.Lens (l . k)
